@@ -225,3 +225,20 @@ impl ::prost::Name for RemoteAttachmentInfo {
         "/xmtp.mls.message_contents.content_types.RemoteAttachmentInfo".into()
     }
 }
+/// DeleteMessage message type
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct DeleteMessage {
+    /// ID of the message to delete
+    #[prost(string, tag = "1")]
+    pub message_id: ::prost::alloc::string::String,
+}
+impl ::prost::Name for DeleteMessage {
+    const NAME: &'static str = "DeleteMessage";
+    const PACKAGE: &'static str = "xmtp.mls.message_contents.content_types";
+    fn full_name() -> ::prost::alloc::string::String {
+        "xmtp.mls.message_contents.content_types.DeleteMessage".into()
+    }
+    fn type_url() -> ::prost::alloc::string::String {
+        "/xmtp.mls.message_contents.content_types.DeleteMessage".into()
+    }
+}
