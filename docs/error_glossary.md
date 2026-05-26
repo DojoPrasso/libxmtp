@@ -4,7 +4,7 @@
 
 This document lists all error codes defined in LibXMTP, the core library underlying the XMTP SDKs. Each error code is a unique identifier returned to help diagnose issues.
 
-**30 error types** across **10 crates** with **342 total error codes**.
+**30 error types** across **10 crates** with **352 total error codes**.
 
 ## mobile
 
@@ -22,6 +22,7 @@ This document lists all error codes defined in LibXMTP, the core library underly
 | `GenericError::ReloadLog` | Reload log error. Failed to reload log subscriber. Not retryable. |
 | `GenericError::Log` | Log error. Error initializing debug log file. Not retryable. |
 | `GenericError::Expired` | Timer expired. Operation timed out. Retryable. |
+| `GenericError::Level` | Log Level failed to parse because it was invalid |
 
 ## wasm
 
@@ -364,6 +365,7 @@ General error type for Mls Storage Trait
 | `ClientError::Conversion` | Conversion Error Data type failed to convert. Not retryable. |
 | `ClientError::RegistrationNotVisible` | Registration not visible. Registration was not visible on the required number of nodes within the timeout. Not retryable. |
 | `ClientError::EnvelopesNotYetVisible` | Envelopes not yet visible. Registration envelopes haven't propagated to the node yet. Retryable. |
+| `ClientError::AlreadyClosed` | Client is closed. Operation was attempted on a client that has been shut down via `Client::close`. Not retryable — build a new client instead. |
 
 ### DeviceSyncError <sub>enum</sub>
 
@@ -442,6 +444,13 @@ General error type for Mls Storage Trait
 | `GroupError::CommitToPendingProposals` | Commit to pending proposals error. Failed to commit pending proposals into an MLS commit. May be retryable. |
 | `GroupError::MergePendingCommit` | Merge pending commit error. Failed to merge a pending commit into local state. May be retryable. |
 | `GroupError::ProposalsNotSupported` | Proposals not supported. Encountered a proposal when our client does not support proposals. Not retryable. |
+| `GroupError::MinVersionExceedsOwnVersion` | Caller asked to set `MIN_SUPPORTED_PROTOCOL_VERSION` to a value the caller's own client does not satisfy. Refusing prevents the caller from immediately pausing themselves (and every peer at or below their version) the moment the bump lands. Not retryable. |
+| `GroupError::MinVersionDowngrade` | Caller asked to lower `MIN_SUPPORTED_PROTOCOL_VERSION` below the floor already on the group. Monotonic-only: a downgrade would silently unpause peers between the old and new floors, defeating the gate. Not retryable. |
+| `GroupError::InvalidMinVersion` | Caller passed a `min_version` string that doesn't parse as semver. Surfaces from the send-side paths (`enable_proposals`, `update_group_min_version`) so SDK consumers can `match`-handle malformed input without parsing string-flattened wrappers. Not retryable. |
+| `GroupError::ComponentSource` | Component source error. Failed to encode, decode, or look up a well-known component during the AppDataUpdate path. Not retryable. |
+| `GroupError::AppDataCommit` | AppData commit error. Failed to build or stage a commit that bundles an inline AppDataUpdate proposal. Wraps the structured `GroupAppDataError` from [`stage_app_data_propose_and_commit`] so the underlying OpenMLS create/stage failure is preserved instead of being string-flattened. |
+| `GroupError::BootstrapSynthesis` | Bootstrap synthesis failure — sender-side couldn't build the complete set of initial component values for the migration commit. Includes identity-update lookup failures. Conditionally retryable: delegates to the wrapped [`BootstrapSynthesisError`], which retries only when an inner identity-update API error is itself retryable. Decode/registry-shape failures are deterministic and not retryable. |
+| `GroupError::BootstrapCommit` | Bootstrap commit-build failure. Not retryable: every variant of [`BootstrapCommitError`] is a deterministic OpenMLS commit failure, a TLS codec error, or a caller-side precondition violation. |
 | `GroupError::CredentialError` | Credential error. MLS credential validation failed. Not retryable. |
 | `GroupError::LeafNodeError` | Leaf node error. MLS leaf node operation failed. Not retryable. |
 | `GroupError::InstallationDiff` | Installation diff error. Installation diff computation failed. May be retryable. |
@@ -535,6 +544,7 @@ Errors that can occur when working with GroupMutablePermissions.
 | `SubscribeError::Db` | Database connection error. Database connection failed. Retryable. |
 | `SubscribeError::Conversion` | Conversion error. Proto conversion failed. Not retryable. |
 | `SubscribeError::Envelope` | Envelope error. Decentralized API envelope error. May be retryable. |
+| `SubscribeError::Enriched` | Enriched Message Error. |
 
 ## xmtp_mls_common
 
