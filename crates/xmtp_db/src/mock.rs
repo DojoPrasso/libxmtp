@@ -472,6 +472,8 @@ mock! {
 
         fn delete_expired_messages(&self) -> Result<Vec<StoredGroupMessage>, crate::ConnectionError>;
 
+        fn min_expire_at_ns(&self) -> Result<Option<i64>, crate::ConnectionError>;
+
         #[mockall::concretize]
         fn delete_message_by_id<MessageId: AsRef<[u8]>>(
             &self,
@@ -681,6 +683,11 @@ mock! {
             &self,
             group_id: &GroupId,
         ) -> Result<Option<i32>, crate::ConnectionError>;
+
+        fn get_latest_chain_start_rowid(
+            &self,
+            group_id: &GroupId,
+        ) -> Result<Option<i32>, crate::ConnectionError>;
     }
 
     impl QueryRemoteCommitLog for DbQuery {
@@ -724,6 +731,8 @@ mock! {
         fn get_tasks(&self) -> Result<Vec<crate::tasks::Task>, StorageError>;
 
         fn get_next_task(&self) -> Result<Option<crate::tasks::Task>, StorageError>;
+
+        fn upsert_pending_self_remove_task(&self, group_id: &GroupId, task: crate::tasks::NewTask) -> Result<(), StorageError>;
 
         fn update_task(
             &self,

@@ -54,6 +54,18 @@ pub enum IntentKind {
     /// sniffing the extension-set shape.
     #[doc(alias = "AppData migration")]
     BootstrapMigration = 11,
+    /// Generic AppData component write. The intent payload carries a
+    /// `(component_id, AppDataUpdateOp)` pair where `AppDataUpdateOp` is
+    /// either `Replace(bytes)` (full-replace components — Bytes / String
+    /// types) or `DeltaWithBase { pre, post }` (TlsMap / TlsSet types,
+    /// where the handler computes the residual delta at commit time from
+    /// the current state, the pre value, and the post value).
+    ///
+    /// Replaces the proliferation of per-component IntentKinds. Existing
+    /// typed intents (`UpdateAdminList`, `UpdatePermission`,
+    /// `MetadataUpdate`) are not migrated by the introducing PR — they
+    /// continue to work, and a follow-on can fold them in.
+    AppDataUpdate = 12,
 }
 
 impl std::fmt::Display for IntentKind {
@@ -70,6 +82,7 @@ impl std::fmt::Display for IntentKind {
             IntentKind::ProposeGroupContextExtensions => "ProposeGroupContextExtensions",
             IntentKind::CommitPendingProposals => "CommitPendingProposals",
             IntentKind::BootstrapMigration => "BootstrapMigration",
+            IntentKind::AppDataUpdate => "AppDataUpdate",
         };
         write!(f, "{}", description)
     }
@@ -339,7 +352,7 @@ where
 }
 
 impl<C: ConnectionExt> QueryGroupIntent for DbConnection<C> {
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[xmtp_common::db_span]
     fn insert_group_intent(
         &self,
         to_save: NewGroupIntent,
@@ -352,7 +365,7 @@ impl<C: ConnectionExt> QueryGroupIntent for DbConnection<C> {
     }
 
     // Query for group_intents by group_id, optionally filtering by state and kind
-    #[tracing::instrument(level = "debug", skip(self), fields(group_id = hex::encode(group_id.as_ref())))]
+    #[xmtp_common::db_span]
     fn find_group_intents<Id: AsRef<[u8]>>(
         &self,
         group_id: Id,
@@ -513,11 +526,7 @@ impl<C: ConnectionExt> QueryGroupIntent for DbConnection<C> {
 
     // Simple lookup of intents by payload hash, meant to be used when processing messages off the
     // network
-    #[tracing::instrument(
-        level = "debug",
-        skip(self),
-        fields(payload_hash = hex::encode(payload_hash))
-    )]
+    #[xmtp_common::db_span]
     fn find_group_intent_by_payload_hash(
         &self,
         payload_hash: &[u8],
@@ -534,7 +543,7 @@ impl<C: ConnectionExt> QueryGroupIntent for DbConnection<C> {
 
     /// Find the commit message refresh state for each intent by payload hash.
     /// Returns a map from payload hash to a vector of dependencies (one per originator).
-    #[tracing::instrument(level = "debug", skip_all)]
+    #[xmtp_common::db_span]
     fn find_dependant_commits<P: AsRef<[u8]>>(
         &self,
         payload_hashes: &[P],
@@ -652,6 +661,7 @@ where
             9 => Ok(IntentKind::ProposeGroupContextExtensions),
             10 => Ok(IntentKind::CommitPendingProposals),
             11 => Ok(IntentKind::BootstrapMigration),
+            12 => Ok(IntentKind::AppDataUpdate),
             x => Err(format!("Unrecognized IntentKind variant {}", x).into()),
         }
     }

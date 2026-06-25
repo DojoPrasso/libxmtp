@@ -6,6 +6,7 @@ use crate::message::{
     FfiActions, FfiDecodedMessage, FfiDeliveryStatus, FfiIntent, FfiReactionPayload,
 };
 use crate::worker::{FfiDeviceSyncMode, FfiSyncWorker};
+use crate::worker_config::FfiWorkerConfig;
 use crate::{FfiError, FfiGroupUpdated, FfiReply, FfiWalletSendCalls, GenericError};
 use futures::future::try_join_all;
 use prost::Message;
@@ -308,6 +309,11 @@ pub struct DbOptions {
     pub encryption_key: Option<Vec<u8>>,
     pub max_db_pool_size: Option<u32>,
     pub min_db_pool_size: Option<u32>,
+    /// When true, use a single DB connection instead of a pool (one file
+    /// descriptor). Pool-size options are ignored. Defaults to unset so existing
+    /// foreign callers that construct `DbOptions` without this field still compile.
+    #[uniffi(default = None)]
+    pub use_single_connection: Option<bool>,
 }
 
 impl DbOptions {
@@ -316,12 +322,14 @@ impl DbOptions {
         encryption_key: Option<Vec<u8>>,
         max_db_pool_size: Option<u32>,
         min_db_pool_size: Option<u32>,
+        use_single_connection: Option<bool>,
     ) -> Self {
         Self {
             db,
             encryption_key,
             max_db_pool_size,
             min_db_pool_size,
+            use_single_connection,
         }
     }
 }
@@ -350,7 +358,6 @@ impl DbOptions {
 #[tracing::instrument(level = "debug", skip_all)]
 pub async fn create_client(
     api: Arc<XmtpApiClient>,
-    sync_api: Arc<XmtpApiClient>,
     db: DbOptions,
     inbox_id: &InboxId,
     account_identifier: FfiIdentifier,
@@ -359,6 +366,7 @@ pub async fn create_client(
     device_sync_mode: Option<FfiDeviceSyncMode>,
     allow_offline: Option<bool>,
     fork_recovery_opts: Option<FfiForkRecoveryOpts>,
+    worker_config: Option<FfiWorkerConfig>,
 ) -> Result<Arc<FfiXmtpClient>, FfiError> {
     let ident = account_identifier.clone();
     init_logger();
@@ -368,6 +376,7 @@ pub async fn create_client(
         encryption_key,
         max_db_pool_size,
         min_db_pool_size,
+        use_single_connection,
     } = db;
 
     log::info!(
@@ -377,30 +386,39 @@ pub async fn create_client(
         encryption_key.as_ref().map(|k| k.len())
     );
 
-    let db = if let Some(path) = db {
+    let single = use_single_connection.unwrap_or(false);
+
+    let base = if let Some(path) = db {
         NativeDb::builder().persistent(path)
     } else {
         NativeDb::builder().ephemeral()
     };
-    let db = if let Some(max_size) = max_db_pool_size {
-        db.max_pool_size(max_size)
-    } else {
-        db.max_pool_size(MAX_DB_POOL_SIZE)
-    };
 
-    let db = if let Some(min_size) = min_db_pool_size {
-        db.min_pool_size(min_size)
+    let db = if single {
+        if max_db_pool_size.is_some() || min_db_pool_size.is_some() {
+            log::info!("use_single_connection is set; ignoring max/min db pool size options");
+        }
+        let b = base.single_connection();
+        if let Some(key) = encryption_key {
+            let key: EncryptionKey = key
+                .try_into()
+                .map_err(|_| "Malformed 32 byte encryption key".to_string())?;
+            b.key(key).build()
+        } else {
+            b.build_unencrypted()
+        }
     } else {
-        db.min_pool_size(MIN_DB_POOL_SIZE)
-    };
-
-    let db = if let Some(key) = encryption_key {
-        let key: EncryptionKey = key
-            .try_into()
-            .map_err(|_| "Malformed 32 byte encryption key".to_string())?;
-        db.key(key).build()
-    } else {
-        db.build_unencrypted()
+        let b = base
+            .max_pool_size(max_db_pool_size.unwrap_or(MAX_DB_POOL_SIZE))
+            .min_pool_size(min_db_pool_size.unwrap_or(MIN_DB_POOL_SIZE));
+        if let Some(key) = encryption_key {
+            let key: EncryptionKey = key
+                .try_into()
+                .map_err(|_| "Malformed 32 byte encryption key".to_string())?;
+            b.key(key).build()
+        } else {
+            b.build_unencrypted()
+        }
     }?;
 
     let store = EncryptedMessageStore::new(db)?;
@@ -414,17 +432,14 @@ pub async fn create_client(
     );
 
     let api_client: xmtp_mls::XmtpClientBundle = Arc::unwrap_or_clone(api).client_bundle;
-    let sync_api_client: xmtp_mls::XmtpClientBundle = Arc::unwrap_or_clone(sync_api).client_bundle;
     let cursor_store = Arc::new(SqliteCursorStore::new(store.db()));
     let mut backend = MessageBackendBuilder::default();
     backend.cursor_store(cursor_store);
-    let api_client = backend.clone().from_bundle(api_client)?;
-    let sync_api_client = backend.from_bundle(sync_api_client)?;
+    let api_client = backend.from_bundle(api_client)?;
 
     let mut builder = xmtp_mls::Client::builder(identity_strategy)
-        .api_clients(api_client, sync_api_client)
+        .api_client(api_client)
         .enable_api_stats()?
-        .enable_api_debug_wrapper()?
         .with_remote_verifier()?
         .with_allow_offline(allow_offline)
         .store(store);
@@ -435,6 +450,10 @@ pub async fn create_client(
 
     if let Some(fork_recovery_opts) = fork_recovery_opts {
         builder = builder.fork_recovery_opts(fork_recovery_opts.into());
+    }
+
+    if let Some(worker_config) = worker_config {
+        builder = builder.worker_config(worker_config.into());
     }
 
     let xmtp_client = builder.default_mls_store()?.build().await?;
@@ -1312,12 +1331,19 @@ impl From<FfiGroupQueryOrderBy> for GroupQueryOrderBy {
 #[derive(uniffi::Record, Clone, Default)]
 pub struct FfiSendMessageOpts {
     pub should_push: bool,
+    /// Optional idempotency key. Re-sending identical content with the same key
+    /// produces the same message id and is deduplicated. Defaults to a timestamp.
+    /// Defaults to unset so existing foreign callers that construct
+    /// `FfiSendMessageOpts` without this field still compile.
+    #[uniffi(default = None)]
+    pub idempotency_key: Option<String>,
 }
 
 impl From<FfiSendMessageOpts> for xmtp_mls::groups::send_message_opts::SendMessageOpts {
     fn from(opts: FfiSendMessageOpts) -> Self {
         xmtp_mls::groups::send_message_opts::SendMessageOpts {
             should_push: opts.should_push,
+            idempotency_key: opts.idempotency_key,
         }
     }
 }
@@ -2480,7 +2506,10 @@ impl FfiConversation {
             TextCodec::encode(text.to_string()).map_err(|e| FfiError::generic(e.to_string()))?;
         self.send(
             encoded_content_to_bytes(content),
-            FfiSendMessageOpts { should_push: true },
+            FfiSendMessageOpts {
+                should_push: true,
+                idempotency_key: None,
+            },
         )
         .await
     }
@@ -2520,10 +2549,13 @@ impl FfiConversation {
         &self,
         content_bytes: Vec<u8>,
         should_push: bool,
+        idempotency_key: Option<String>,
     ) -> Result<Vec<u8>, FfiError> {
-        let id = self
-            .inner
-            .prepare_message_for_later_publish(content_bytes.as_slice(), should_push)?;
+        let id = self.inner.prepare_message_for_later_publish(
+            content_bytes.as_slice(),
+            should_push,
+            idempotency_key,
+        )?;
         Ok(id)
     }
 

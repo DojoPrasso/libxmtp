@@ -205,6 +205,13 @@ impl NeedsDbReconnect for DeviceSyncError {
     fn needs_db_reconnect(&self) -> bool {
         match self {
             Self::Client(s) => s.db_needs_connection(),
+            Self::Storage(s) => s.db_needs_connection(),
+            // A dropped pool can hide in these wrapped errors; forward so the
+            // worker stops instead of hot-looping (was `_ => false`).
+            Self::Db(c) => c.db_needs_connection(),
+            Self::Group(e) => e.needs_db_reconnect(),
+            Self::MlsStore(e) => e.needs_db_reconnect(),
+            Self::Subscribe(e) => e.needs_db_reconnect(),
             _ => false,
         }
     }
@@ -314,11 +321,14 @@ where
 
         let message_id = sync_group.prepare_message(
             &content_bytes,
-            send_message_opts::SendMessageOpts { should_push: false },
-            |now| PlaintextEnvelope {
+            send_message_opts::SendMessageOpts {
+                should_push: false,
+                idempotency_key: None,
+            },
+            |key| PlaintextEnvelope {
                 content: Some(Content::V1(V1 {
                     content: content_bytes.clone(),
-                    idempotency_key: now.to_string(),
+                    idempotency_key: key.to_string(),
                 })),
             },
         )?;

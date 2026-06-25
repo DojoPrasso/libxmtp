@@ -1839,7 +1839,6 @@ dependencies = [
  "tokio",
  "toxiproxy_rust",
  "tracing",
- "tracing-subscriber",
  "xmtp-workspace-hack",
  "xmtp_api",
  "xmtp_api_d14n",
@@ -1850,6 +1849,7 @@ dependencies = [
  "xmtp_cryptography",
  "xmtp_db",
  "xmtp_id",
+ "xmtp_logging",
  "xmtp_macro",
  "xmtp_mls",
  "xmtp_proto",
@@ -1894,6 +1894,7 @@ dependencies = [
  "xmtp_cryptography",
  "xmtp_db",
  "xmtp_id",
+ "xmtp_logging",
  "xmtp_macro",
  "xmtp_mls",
  "xmtp_proto",
@@ -6765,6 +6766,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "keepalive-probe"
+version = "1.11.0-dev"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "clap",
+ "hex",
+ "http-body-util",
+ "humantime",
+ "hyper 1.9.0",
+ "hyper-util",
+ "rustls",
+ "tokio",
+ "tokio-rustls",
+ "tonic",
+ "tonic-prost",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "webpki-roots 0.26.11",
+ "xmtp_proto",
+]
+
+[[package]]
 name = "keyboard-types"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8488,6 +8513,95 @@ dependencies = [
 ]
 
 [[package]]
+name = "opentelemetry"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b0142c63252a9e054e68a4c61a5778f7b14f576274d593f8ce883d191a099682"
+dependencies = [
+ "futures-core",
+ "futures-sink",
+ "js-sys",
+ "pin-project-lite",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "opentelemetry-appender-tracing"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c0080f0dc1d7c786f467cd85a4e395fcab11ee852004f39a29a18ab7c25d837"
+dependencies = [
+ "opentelemetry",
+ "tracing",
+ "tracing-core",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "opentelemetry-http"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5683015d09e2df236ef005b17f6f196f0d5f6313c4fa43a7b6a53b52776e4331"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "http 1.4.0",
+ "opentelemetry",
+ "reqwest 0.13.3",
+]
+
+[[package]]
+name = "opentelemetry-otlp"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9966929966d17620d7c316c643ba62631826e10021409357772d5eea84f62c35"
+dependencies = [
+ "http 1.4.0",
+ "opentelemetry",
+ "opentelemetry-http",
+ "opentelemetry-proto",
+ "opentelemetry_sdk",
+ "prost",
+ "reqwest 0.13.3",
+ "thiserror 2.0.18",
+ "tokio",
+ "tonic",
+ "tonic-types",
+]
+
+[[package]]
+name = "opentelemetry-proto"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "56d658ba1faf63f7b9c492cfbe6e0ec365440a16132d3270c1065f7b33f1b638"
+dependencies = [
+ "opentelemetry",
+ "opentelemetry_sdk",
+ "prost",
+ "tonic",
+ "tonic-prost",
+]
+
+[[package]]
+name = "opentelemetry_sdk"
+version = "0.32.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9b59f80e1ac4d5ff7a2db8fb6c80badb7f0f3f858211fba08dd9aaec750894f9"
+dependencies = [
+ "futures-channel",
+ "futures-executor",
+ "futures-util",
+ "opentelemetry",
+ "percent-encoding",
+ "portable-atomic",
+ "rand 0.9.4",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9819,6 +9933,7 @@ checksum = "62e0021ea2c22aed41653bc7e1419abb2c97e038ff2c33d0e1309e49a97deec0"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
  "futures-util",
  "http 1.4.0",
@@ -11861,7 +11976,7 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
- "webpki-roots",
+ "webpki-roots 1.0.7",
 ]
 
 [[package]]
@@ -11901,6 +12016,17 @@ dependencies = [
  "syn 2.0.117",
  "tempfile",
  "tonic-build",
+]
+
+[[package]]
+name = "tonic-types"
+version = "0.14.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a875a902255423d34c1f20838ab374126db8eb41625b7947a1d54113b0b7399"
+dependencies = [
+ "prost",
+ "prost-types",
+ "tonic",
 ]
 
 [[package]]
@@ -12058,19 +12184,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tracing-forest"
-version = "0.3.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f09cb459317a3811f76644334473239d696cd8efc606963ae7d1c308cead3b74"
-dependencies = [
- "chrono",
- "smallvec",
- "thiserror 2.0.18",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "tracing-log"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12094,10 +12207,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-opentelemetry"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adbc64cba7137545b8044cb1fe9814f7aacf3c6b5f9b45be8bb5db538befdb26"
+dependencies = [
+ "js-sys",
+ "opentelemetry",
+ "smallvec",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+ "tracing-subscriber",
+ "web-time",
+]
+
+[[package]]
 name = "tracing-oslog"
 version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d76902d2a8d5f9f55a81155c08971734071968c90f2d9bfe645fe700579b2950"
+source = "git+https://github.com/xmtp/tracing-oslog?rev=69cebec3804c33267b8d18aa50a5d9ba18617121#69cebec3804c33267b8d18aa50a5d9ba18617121"
 dependencies = [
  "cc",
  "cfg-if",
@@ -12140,17 +12268,6 @@ dependencies = [
  "tracing-serde",
  "valuable",
  "valuable-serde",
-]
-
-[[package]]
-name = "tracing-wasm"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4575c663a174420fa2d78f4108ff68f65bf2fbb7dd89f33749b6e826b3626e07"
-dependencies = [
- "tracing",
- "tracing-subscriber",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -13205,6 +13322,15 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
+version = "0.26.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "521bc38abb08001b01866da9f51eb7c5d647a19260e00054a8c7fd5f9e57f7a9"
+dependencies = [
+ "webpki-roots 1.0.7",
+]
+
+[[package]]
+name = "webpki-roots"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "52f5ee44c96cf55f1b349600768e3ece3a8f26010c05265ab73f945bb1a2eb9d"
@@ -14036,6 +14162,7 @@ dependencies = [
  "xmtp_cryptography",
  "xmtp_db",
  "xmtp_id",
+ "xmtp_logging",
  "xmtp_mls",
  "xmtp_mls_common",
  "xmtp_proto",
@@ -14128,6 +14255,7 @@ dependencies = [
  "clap",
  "clap_builder",
  "const-hex",
+ "crossbeam-utils",
  "crypto-common 0.1.7",
  "derive_more",
  "diesel",
@@ -14197,6 +14325,7 @@ dependencies = [
  "syn 2.0.117",
  "sync_wrapper 1.0.2",
  "time",
+ "tokio-stream",
  "tokio-util",
  "toml_datetime 1.1.1+spec-1.1.0",
  "toml_parser",
@@ -14378,7 +14507,6 @@ name = "xmtp_common"
 version = "1.11.0-dev"
 dependencies = [
  "async-trait",
- "console_error_panic_hook",
  "const-hex",
  "const_panic",
  "ctor 0.12.0",
@@ -14387,8 +14515,6 @@ dependencies = [
  "getrandom 0.4.2",
  "gloo-timers 0.4.0",
  "js-sys",
- "once_cell",
- "owo-colors",
  "parking_lot",
  "rand 0.10.1",
  "thiserror 2.0.18",
@@ -14398,9 +14524,7 @@ dependencies = [
  "toxiproxy_rust",
  "tracing",
  "tracing-flame",
- "tracing-forest",
  "tracing-subscriber",
- "tracing-wasm",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "wasm-bindgen-test",
@@ -14409,6 +14533,7 @@ dependencies = [
  "xmtp-workspace-hack",
  "xmtp_common",
  "xmtp_cryptography",
+ "xmtp_logging",
  "xmtp_macro",
 ]
 
@@ -14571,6 +14696,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "xmtp_logging"
+version = "1.11.0-dev"
+dependencies = [
+ "console_error_panic_hook",
+ "opentelemetry",
+ "opentelemetry-appender-tracing",
+ "opentelemetry-otlp",
+ "opentelemetry_sdk",
+ "paranoid-android",
+ "parking_lot",
+ "thiserror 2.0.18",
+ "tracing",
+ "tracing-appender",
+ "tracing-opentelemetry",
+ "tracing-oslog",
+ "tracing-subscriber",
+ "tracing-web",
+ "tracing_android_trace",
+ "xmtp-workspace-hack",
+]
+
+[[package]]
 name = "xmtp_macro"
 version = "1.11.0-dev"
 dependencies = [
@@ -14623,6 +14770,7 @@ dependencies = [
  "parking_lot",
  "passkey",
  "pin-project",
+ "proptest",
  "prost",
  "public-suffix",
  "rand 0.10.1",
@@ -14672,7 +14820,11 @@ version = "1.11.0-dev"
 dependencies = [
  "bon",
  "const-hex",
+ "hpke-rs",
  "openmls",
+ "openmls_libcrux_crypto",
+ "openmls_rust_crypto",
+ "openmls_traits",
  "parking_lot",
  "proptest",
  "prost",
@@ -14746,7 +14898,6 @@ dependencies = [
  "ctor 0.12.0",
  "fdlimit",
  "futures",
- "paranoid-android",
  "parking_lot",
  "prost",
  "rand 0.10.1",
@@ -14754,10 +14905,6 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "tracing",
- "tracing-appender",
- "tracing-oslog",
- "tracing-subscriber",
- "tracing_android_trace",
  "uniffi",
  "uuid",
  "vergen-gix",
@@ -14772,6 +14919,7 @@ dependencies = [
  "xmtp_cryptography",
  "xmtp_db",
  "xmtp_id",
+ "xmtp_logging",
  "xmtp_macro",
  "xmtp_mls",
  "xmtp_proto",
