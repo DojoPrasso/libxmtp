@@ -18,6 +18,19 @@
   </p>
 </p>
 
+## Table of Contents
+
+- [Requirements](#requirements)
+- [Development](#development)
+- [Tips & Tricks](#tips--tricks)
+  - [Log Output Flags for Tests](#log-output-flags-for-tests)
+- [Quick Start (Dev Containers)](#quick-start-dev-containers)
+- [Quick Start (nix)](#quick-start-nix)
+- [Structure](#structure)
+  - [Run the benchmarks](#run-the-benchmarks)
+- [Code Coverage](#code-coverage)
+- [Contributing](#contributing)
+
 ## Requirements
 
 - [Rustup](https://rustup.rs/)
